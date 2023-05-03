@@ -62,8 +62,7 @@ def generate_bolded_answer(question):
         link = bolded_words[words_with_links[0]]
         explanation += f"\n\nLearn more about {words_with_links[0]} here: {link}"
     else:
-        link = bolded_words['example']
-        explanation += f"\n\nLearn more about example here: {link}"
+        explanation += f"\n\nLearn more about here:"
 
     # Add the hashtag
     explanation += "\n\n#SPJ11"

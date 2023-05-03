@@ -5,10 +5,10 @@ import pyperclip
 import random
 
 # Set up the OpenAI API key
-openai.api_key = "YOUR_OPENAI_API_KEY"
+openai.api_key = "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"
 
 # Set up the Telegram bot token
-telegram_bot_token = "YOUR_TELEGRAM_BOT_TOKEN"
+telegram_bot_token = "6286220711:AAFlXQ6i_yWSJXSuW2hIqQwKW2mfZiW4DXo"
 bot = telegram.Bot(token=telegram_bot_token)
 
 def generate_bolded_answer(question):

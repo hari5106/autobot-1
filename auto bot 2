@@ -37,7 +37,7 @@ def generate_bolded_answer(question):
 
     # Use the OpenAI API to generate an explanation
     response = openai.Completion.create(
-        engine="davinci", prompt=f"Explain: {answer}", max_tokens=175, n=1, stop=None, temperature=0.5,
+        engine="Ada", prompt=f"Explain: {answer}", max_tokens=175, n=1, stop=None, temperature=0.5,
     )
     explanation = response.choices[0].text.strip()
 

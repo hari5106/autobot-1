@@ -1,0 +1,95 @@
+import openai
+import telegram
+from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
+import pyperclip
+import random
+
+# Set up the OpenAI API key
+openai.api_key = "YOUR_OPENAI_API_KEY"
+
+# Set up the Telegram bot token
+telegram_bot_token = "YOUR_TELEGRAM_BOT_TOKEN"
+bot = telegram.Bot(token=telegram_bot_token)
+
+def generate_bolded_answer(question):
+    # Use the OpenAI API to generate an answer
+    response = openai.Completion.create(
+        engine="davinci", prompt=question, max_tokens=30, n=1, stop=None, temperature=0.5,
+    )
+    answer = response.choices[0].text.strip()
+
+    # Identify the words to bold in the answer
+    words_to_bold_answer = [word for word in answer.split() if len(word) > 5][:2]
+
+    # Find the words in the answer that have links
+    words_with_links = []
+    for word in words_to_bold_answer:
+        if word in bolded_words:
+            words_with_links.append(word)
+
+    # If none of the bolded words are present in the answer text, find any two words with more than 5 letters to bold
+    if not words_with_links:
+        words_to_bold_answer = [word for word in answer.split() if len(word) > 5][:2]
+
+    # Bold the identified words in the answer
+    for word in words_to_bold_answer:
+        answer = answer.replace(word, f"<b>{word}</b>")
+
+    # Use the OpenAI API to generate an explanation
+    response = openai.Completion.create(
+        engine="davinci", prompt=f"Explain: {answer}", max_tokens=175, n=1, stop=None, temperature=0.5,
+    )
+    explanation = response.choices[0].text.strip()
+
+    # Identify the words to bold in the explanation
+    words_to_bold_explanation = [word for word in explanation.split() if len(word) > 5][:3]
+
+    # Find the words in the explanation that have links
+    for word in words_to_bold_explanation:
+        if word in bolded_words:
+            words_with_links.append(word)
+
+    # If none of the bolded words are present in the explanation text, find any three words with more than 5 letters to bold
+    if not words_with_links:
+        words_to_bold_explanation = [word for word in explanation.split() if len(word) > 5][:3]
+
+    # Bold the identified words in the explanation
+    for word in words_to_bold_explanation:
+        explanation = explanation.replace(word, f"<b>{word}</b>")
+
+    # Add the link for the first bolded word in the answer or explanation
+    if words_with_links:
+        link = bolded_words[words_with_links[0]]
+        explanation += f"\n\nLearn more about {words_with_links[0]} here: {link}"
+    else:
+        link = bolded_words['example']
+        explanation += f"\n\nLearn more about example here: {link}"
+
+    # Add the hashtag
+    explanation += "\n\n#SPJ11"
+
+    return answer + "\n\n" + explanation
+
+# Dictionary of words to bold and their corresponding links
+bolded_words = {
+    "economy": "https://en.wikipedia.org/wiki/Economy",
+    "government": "https://en.wikipedia.org/wiki/Government",
+    "industry": "https://en.wikipedia.org/wiki/Industry",
+    "finance": "https://en.wikipedia.org/wiki/Finance",
+    "example": "https://en.wikipedia.org/wiki/Example",
+}
+ # Copy the final answer to the clipboard
+pyperclip.copy ("return")
+
+# Define the function that handles incoming messages
+def handle_message(update, context):
+    message_text = update.message.text
+    generate_bolded_answer(message_text)
+
+# Set up the Telegram bot handlers
+updater = Updater(token=telegram_bot_token, use_context=True)
+dispatcher = updater.dispatcher
+dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
+
+# Start the Telegram bot
+updater.start_polling()

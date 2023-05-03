@@ -14,7 +14,7 @@ bot = telegram.Bot(token=telegram_bot_token)
 def generate_bolded_answer(question):
     # Use the OpenAI API to generate an answer
     response = openai.Completion.create(
-        engine="davinci", prompt=question, max_tokens=30, n=1, stop=None, temperature=0.5,
+        engine="Ada", prompt=question, max_tokens=30, n=1, stop=None, temperature=0.5,
     )
     answer = response.choices[0].text.strip()
 

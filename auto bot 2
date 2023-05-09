@@ -1,94 +1,123 @@
-import openai
-import telegram
-from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
-import pyperclip
-import random
+import logging
+import asyncio
+import re
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import Message
+from aiogram import executor
 
-# Set up the OpenAI API key
-openai.api_key = "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"
+# Replace YOUR_BOT_TOKEN with your bot token obtained from BotFather
+API_TOKEN = '6272908545:AAFG4g85gUbR2MpKU8frgIUWy4KqS8ZcFBo'
 
-# Set up the Telegram bot token
-telegram_bot_token = "6286220711:AAFlXQ6i_yWSJXSuW2hIqQwKW2mfZiW4DXo"
-bot = telegram.Bot(token=telegram_bot_token)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
-def generate_bolded_answer(question):
-    # Use the OpenAI API to generate an answer
-    response = openai.Completion.create(
-        engine="Ada", prompt=question, max_tokens=30, n=1, stop=None, temperature=0.5,
-    )
-    answer = response.choices[0].text.strip()
+# Initialize bot and dispatcher
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
 
-    # Identify the words to bold in the answer
-    words_to_bold_answer = [word for word in answer.split() if len(word) > 5][:2]
 
-    # Find the words in the answer that have links
-    words_with_links = []
-    for word in words_to_bold_answer:
-        if word in bolded_words:
-            words_with_links.append(word)
+def split_text(text):
+  words = text.split(' ')
+  first_half = ' '.join(words[:30])
 
-    # If none of the bolded words are present in the answer text, find any two words with more than 5 letters to bold
-    if not words_with_links:
-        words_to_bold_answer = [word for word in answer.split() if len(word) > 5][:2]
+  # If the first half contains a period and it's before the 15th word,
+  # find the last period before the 15th word and use that as the endpoint
+  if '.' in first_half and first_half.index('.') < 15:
+    for i in range(14, 0, -1):
+      if words[i].endswith('.'):
+        first_half = ' '.join(words[:i + 1])
+        break
 
-    # Bold the identified words in the answer
-    for word in words_to_bold_answer:
-        answer = answer.replace(word, f"<b>{word}</b>")
+  second_half = ' '.join(words[len(first_half.split()):])
 
-    # Use the OpenAI API to generate an explanation
-    response = openai.Completion.create(
-        engine="Ada", prompt=f"Explain: {answer}", max_tokens=175, n=1, stop=None, temperature=0.5,
-    )
-    explanation = response.choices[0].text.strip()
+  # If the second half starts with a space, remove it
+  if second_half.startswith(' '):
+    second_half = second_half[1:]
 
-    # Identify the words to bold in the explanation
-    words_to_bold_explanation = [word for word in explanation.split() if len(word) > 5][:3]
+  # If the first half ends on a word that's also in the second half,
+  # move the endpoint of the first half to the previous sentence
+  if len(second_half) > 0 and first_half.split()[-1] in second_half.split():
+    for i in range(len(first_half.split()) - 2, 0, -1):
+      if first_half.split()[i].endswith('.'):
+        first_half = ' '.join(words[:i + 1])
+        second_half = ' '.join(words[len(first_half.split()):])
+        if second_half.startswith(' '):
+          second_half = second_half[1:]
+        break
 
-    # Find the words in the explanation that have links
-    for word in words_to_bold_explanation:
-        if word in bolded_words:
-            words_with_links.append(word)
+  second_half = second_half.replace(
+    '\n\n', '\n')  # replace double new lines with single new lines
 
-    # If none of the bolded words are present in the explanation text, find any three words with more than 5 letters to bold
-    if not words_with_links:
-        words_to_bold_explanation = [word for word in explanation.split() if len(word) > 5][:3]
+  return (first_half, second_half)
 
-    # Bold the identified words in the explanation
-    for word in words_to_bold_explanation:
-        explanation = explanation.replace(word, f"<b>{word}</b>")
 
-    # Add the link for the first bolded word in the answer or explanation
-    if words_with_links:
-        link = bolded_words[words_with_links[0]]
-        explanation += f"\n\nLearn more about {words_with_links[0]} here: {link}"
-    else:
-        explanation += f"\n\nLearn more about here:"
+@dp.message_handler()
+async def start_command(message: Message):
+  text = message.text.strip()
 
-    # Add the hashtag
-    explanation += "\n\n#SPJ11"
+  words = []  # default value for words
 
-    return answer + "\n\n" + explanation
+  if 'therefore' in text.lower():
+    # Split the input at 'therefore'
+    parts = text.lower().split('therefore')
+    # Get the first part
+    first_part = parts[0].strip()
+    # Get the first sentence in the second part
+    second_part_sentences = parts[1].split('.')
+    first_sentence = second_part_sentences[0].strip() + '.'
+    # Get the remaining sentences in the second part
+    remaining_sentences = '.'.join(second_part_sentences[1:]).strip()
+    # Combine the first part and remaining sentences in the second part
+    second_part = first_part + ' ' + remaining_sentences
 
-# Dictionary of words to bold and their corresponding links
-bolded_words = {
-    "economy": "https://en.wikipedia.org/wiki/Economy",
-    "government": "https://en.wikipedia.org/wiki/Government",
-    "industry": "https://en.wikipedia.org/wiki/Industry",
-    "finance": "https://en.wikipedia.org/wiki/Finance",
-    "example": "https://en.wikipedia.org/wiki/Example",
+    # Capitalize the first letter of the first sentence if necessary
+    first_sentence = first_sentence.lstrip(',:;./\\').strip()
+    first_sentence = first_sentence[0].upper(
+    ) + first_sentence[1:] if first_sentence[0].islower() else first_sentence
+
+    # Combine the first sentence and the remaining sentences in the second part
+    first_half = first_sentence
+    second_half = second_part.replace(
+      '\n\n', '\n')  # replace double new lines with single new lines
+  else:
+    first_half, second_half = split_text(text)
+
+  # Define the result variable here
+  result = ""
+
+  result += f"{first_half}\n\n"
+  if second_half:
+    result += f"{second_half}\n\n"
+    
+  # Check if any word in the dictionary appears in the message
+  found_word = False
+  for word in dictionary:
+    if word.lower() in text.lower():
+      found_word = True
+      # Replace the entire message with a bold version of the message
+      text = text.replace(word, f'<a href="{dictionary[word]}"><u>{word}</u></a>', 1)
+      break
+      
+  if not found_word and len(words) > 30:
+    first_word = list(dictionary.keys())[0]
+    result += f"Learn more about {first_word} here: \n {dictionary[first_word]} \n\n #SPJ11"
+  elif found_word:
+    first_word = list(
+      filter(lambda w: w.lower() in text.lower(), dictionary.keys()))[0]
+    result += f"Learn more about {first_word} here: \n{dictionary[first_word]} \n\n #SPJ11"
+  else:
+    first_word = list(dictionary.keys())[0]
+    result += f"Learn more about {first_word} here: \n {dictionary[first_word]} \n\n #SPJ11"
+    
+  await message.reply(result, parse_mode="HTML")
+
+
+# Define dictionary of words and links
+dictionary = {
+  "word1": "https://example.com/word1",
+  "word2": "https://example.com/word2",
+  "liquid": "https://example.com/word3"
 }
- # Copy the final answer to the clipboard
-pyperclip.copy ("return")
 
-# Define the function that handles incoming messages
-def handle_message(update, context):
-    message_text = update.message.text
-    generate_bolded_answer(message_text)
-
-# Set up the Telegram bot handlers
-updater = Updater(token=telegram_bot_token, use_context=True)
-dispatcher = updater.dispatcher
-dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
-
-# Start the Telegram bot
-updater.start_polling()
+if __name__ == '__main__':
+  executor.start_polling(dp, skip_updates=False)

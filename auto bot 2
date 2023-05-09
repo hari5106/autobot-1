@@ -6,7 +6,7 @@ from aiogram.types import Message
 from aiogram import executor
 
 # Replace YOUR_BOT_TOKEN with your bot token obtained from BotFather
-API_TOKEN = '6272908545:AAFG4g85gUbR2MpKU8frgIUWy4KqS8ZcFBo'
+API_TOKEN = '6272908545:AAF2Z3aJCVnFGnDgDC1KaQKh0F8SlfgOSno'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,22 +17,30 @@ dp = Dispatcher(bot)
 
 
 def split_text(text):
-  words = text.split(' ')
-  first_half = ' '.join(words[:30])
+  words_to_remove = ["harm", "laws", ""]
+  for word in words_to_remove:
+    text = text.replace(word, "")
 
-  # If the first half contains a period and it's before the 15th word,
-  # find the last period before the 15th word and use that as the endpoint
-  if '.' in first_half and first_half.index('.') < 15:
-    for i in range(14, 0, -1):
-      if words[i].endswith('.'):
-        first_half = ' '.join(words[:i + 1])
-        break
+  words = text.split(' ')
+  min_words_first_half = 15
+  first_half = ''
+  stop_found = False
+  for i, word in enumerate(words):
+    if i < min_words_first_half:
+      first_half += word + ' '
+    elif word.endswith('.'):
+      first_half += word + ' '
+      stop_found = True
+      break
+    else:
+      first_half += word + ' '
+
+  if not stop_found:
+    last_period_idx = first_half.rfind('.')
+    if last_period_idx > 0:
+      first_half = first_half[:last_period_idx + 1]
 
   second_half = ' '.join(words[len(first_half.split()):])
-
-  # If the second half starts with a space, remove it
-  if second_half.startswith(' '):
-    second_half = second_half[1:]
 
   # If the first half ends on a word that's also in the second half,
   # move the endpoint of the first half to the previous sentence
@@ -57,17 +65,29 @@ async def start_command(message: Message):
 
   words = []  # default value for words
 
+  # Check if any word in the dictionary appears in the message
+  found_word = False
+  for word in dictionary:
+    if word.lower() in text.lower():
+      found_word = True
+      # Replace the entire message with a bold version of the message
+      text = text.replace(word,
+                          f'<a href="{dictionary[word]}"><u>{word}</u></a>', 1)
+      break
+
+  words_to_remove = ["harm", "word2", "word3"]
+  for word in words_to_remove:
+    text = text.replace(word, "")
+
   if 'therefore' in text.lower():
     # Split the input at 'therefore'
     parts = text.lower().split('therefore')
     # Get the first part
     first_part = parts[0].strip()
-    # Get the first sentence in the second part
+    # Get the second part
     second_part_sentences = parts[1].split('.')
     first_sentence = second_part_sentences[0].strip() + '.'
-    # Get the remaining sentences in the second part
     remaining_sentences = '.'.join(second_part_sentences[1:]).strip()
-    # Combine the first part and remaining sentences in the second part
     second_part = first_part + ' ' + remaining_sentences
 
     # Capitalize the first letter of the first sentence if necessary
@@ -75,10 +95,15 @@ async def start_command(message: Message):
     first_sentence = first_sentence[0].upper(
     ) + first_sentence[1:] if first_sentence[0].islower() else first_sentence
 
-    # Combine the first sentence and the remaining sentences in the second part
-    first_half = first_sentence
-    second_half = second_part.replace(
-      '\n\n', '\n')  # replace double new lines with single new lines
+    # If the first sentence in the second part has less than 10 words, pick the second sentence instead
+    second_sentence = second_part_sentences[1].strip() + '.'
+    if len(first_sentence.split()) < 10:
+      first_half = first_sentence + second_sentence
+      second_half = first_part + ' ' + remaining_sentences.replace(
+        second_sentence, '').strip()
+    else:
+      first_half = first_sentence
+      second_half = second_part.replace('\n\n', '\n').strip()
   else:
     first_half, second_half = split_text(text)
 
@@ -88,27 +113,19 @@ async def start_command(message: Message):
   result += f"{first_half}\n\n"
   if second_half:
     result += f"{second_half}\n\n"
-    
-  # Check if any word in the dictionary appears in the message
-  found_word = False
-  for word in dictionary:
-    if word.lower() in text.lower():
-      found_word = True
-      # Replace the entire message with a bold version of the message
-      text = text.replace(word, f'<a href="{dictionary[word]}"><u>{word}</u></a>', 1)
-      break
-      
+
   if not found_word and len(words) > 30:
     first_word = list(dictionary.keys())[0]
-    result += f"Learn more about {first_word} here: \n {dictionary[first_word]} \n\n #SPJ11"
+    result += f"Learn more about {first_word} here: \n {dictionary[first_word]} "
   elif found_word:
     first_word = list(
       filter(lambda w: w.lower() in text.lower(), dictionary.keys()))[0]
-    result += f"Learn more about {first_word} here: \n{dictionary[first_word]} \n\n #SPJ11"
+    result += f"Learn more about {first_word} here: \n{dictionary[first_word]} "
   else:
     first_word = list(dictionary.keys())[0]
-    result += f"Learn more about {first_word} here: \n {dictionary[first_word]} \n\n #SPJ11"
-    
+    result += f"Learn more about {first_word} here: \n {dictionary[first_word]} "
+
+  result += "\n\n#SPJ11"
   await message.reply(result, parse_mode="HTML")
 
 

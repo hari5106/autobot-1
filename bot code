@@ -1,0 +1,88 @@
+import logging
+import asyncio
+import re
+import openai
+import aiogram
+from aiogram.types import Message
+from aiogram import executor
+
+BOT_API_KEY = "6272908545:AAFPOMIY7NdbSzKQBiEuQunQdQx7xUkcnJM"
+
+bot = aiogram.Bot(BOT_API_KEY)
+dp = aiogram.Dispatcher(bot=bot)
+
+
+@dp.message_handler(commands=['start'])
+async def start(message: Message):
+  await message.reply("Hello there")
+
+
+@dp.message_handler()
+async def normal_message(message: Message):
+  prompt = message.text
+  prompt += "\n write min 1000 words"
+  openai.api_key = "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"
+  response = openai.ChatCompletion.create(
+    model="gpt-3.5-turbo",
+    messages=[{'role':'system','content':""},
+              {'role':'user','content':f'{prompt}'}],
+    max_tokens=180,
+    n=1,
+    stop=None,
+    temperature=0.7,
+  )
+  response_text = response['choices'][0]['message']['content']
+  print(response_text)
+  sudha = await split_text(response_text)
+  await message.reply(f"{sudha[0]},\n\n{sudha[1]}")
+
+
+async def split_text(text):
+  words_to_remove = ["harm", "laws", ""]
+  for word in words_to_remove:
+    text = text.replace(word, "")
+
+  words = text.split(' ')
+  min_words_first_half = 15
+  first_half = ''
+  stop_found = False
+  for i, word in enumerate(words):
+    if i < min_words_first_half:
+      first_half += word + ' '
+    elif word.endswith('.'):
+      first_half += word + ' '
+      stop_found = True
+      break
+    else:
+      first_half += word + ' '
+
+  if not stop_found:
+    last_period_idx = first_half.rfind('.')
+    if last_period_idx > 0:
+      first_half = first_half[:last_period_idx + 1]
+
+  second_half = ' '.join(words[len(first_half.split()):])
+
+  # If the first half ends on a word that's also in the second half,
+  # move the endpoint of the first half to the previous sentence
+  if len(second_half) > 0 and first_half.split()[-1] in second_half.split():
+    for i in range(len(first_half.split()) - 2, 0, -1):
+      if first_half.split()[i].endswith('.'):
+        first_half = ' '.join(words[:i + 1])
+        second_half = ' '.join(words[len(first_half.split()):])
+        if second_half.startswith(' '):
+          second_half = second_half[1:]
+        break
+
+  second_half = second_half.replace(
+    '\n\n', '\n')  # replace double new lines with single new lines
+  hari = [first_half, second_half]
+  return hari
+
+
+async def main(_):
+  print("Bot is up....")
+
+
+if __name__ == '__main__':
+  executor.start_polling(dp, skip_updates=False, on_startup=main)
